@@ -1,9 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-package cc.adf.metrics.agent.visitor;
+package cc.adf.metrics.agent.visitor.vo;
 
 import java.util.logging.Logger;
 import org.objectweb.asm.AnnotationVisitor;
@@ -21,11 +16,15 @@ import static org.objectweb.asm.Opcodes.ATHROW;
 import static org.objectweb.asm.Opcodes.ARETURN;
 
 import static org.objectweb.asm.Opcodes.DUP;
+import static org.objectweb.asm.Opcodes.GETSTATIC;
 import static org.objectweb.asm.Opcodes.IFEQ;
+import static org.objectweb.asm.Opcodes.IFLE;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
 import static org.objectweb.asm.Opcodes.IRETURN;
+import static org.objectweb.asm.Opcodes.LCMP;
+import static org.objectweb.asm.Opcodes.LDIV;
 import static org.objectweb.asm.Opcodes.LLOAD;
 import static org.objectweb.asm.Opcodes.LSTORE;
 import static org.objectweb.asm.Opcodes.LSUB;
@@ -40,17 +39,14 @@ import org.objectweb.asm.commons.LocalVariablesSorter;
  *
  * @author cc
  */
-public class MetricsMethodVisitor extends MethodVisitor{
+public class MetricsExecuteQueryMethodVisitor extends MethodVisitor{
     public LocalVariablesSorter localVariablesSorter;
-    //public AnalyzerAdapter analyzerAdapter;
     private String className;
     private String methodName;
     private String desc;
-    //private String methodDescriptor;
     private int time;
-    //private int maxStack = 0;
 
-    public MetricsMethodVisitor(MethodVisitor mv, String className, String methodName, String desc) {
+    public MetricsExecuteQueryMethodVisitor(MethodVisitor mv, String className, String methodName, String desc) {
         super(ASM4, mv);
         System.out.println("methodName: " + methodName);
         this.className = className;
@@ -65,60 +61,57 @@ public class MetricsMethodVisitor extends MethodVisitor{
         mv.visitMethodInsn(INVOKESTATIC, "java/lang/System", "nanoTime", "()J", false);
         time = localVariablesSorter.newLocal(Type.LONG_TYPE);
         mv.visitVarInsn(LSTORE, time);
-        if(methodName.equals("passivateState")){
-            addPassivationMessageInjection();
-        }
         System.out.println("End Visit Code " + methodName);
         //maxStack = 1;
-    }
-
-    @Override
-    public void visitEnd() {
-        System.out.println("Visit End " + methodName);
-        //addEndingInjection();
-        super.visitEnd(); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    private void addPassivationMessageInjection(){
-        mv.visitLdcInsn(Type.getType("Loracle/jbo/server/ApplicationModuleImpl;"));
-        mv.visitMethodInsn(INVOKESTATIC, "oracle/adf/share/logging/ADFLogger", "createADFLogger", "(Ljava/lang/Class;)Loracle/adf/share/logging/ADFLogger;", false);
-        mv.visitTypeInsn(NEW, "java/lang/StringBuilder");
-        mv.visitInsn(DUP);
-        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false);
-        mv.visitLdcInsn("passivateState, ");
-        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-        mv.visitVarInsn(ALOAD, 0);
-        mv.visitMethodInsn(INVOKESPECIAL, "oracle/jbo/server/ApplicationModuleImpl", "getDetailName", "()Ljava/lang/String;", false);
-        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;", false);
-        mv.visitMethodInsn(INVOKEVIRTUAL, "oracle/adf/share/logging/ADFLogger", "warning", "(Ljava/lang/String;)V", false);
     }
     
     private void addElapsedTimerEndingInjection(){
         System.out.println("Proceed to add ending injection");
-        mv.visitLdcInsn(Type.getType("L" + this.className +";"));
-        //mv.visitLdcInsn(MetricsMethodVisitor.class.toString());
-        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "toString", "()Ljava/lang/String;", false);
-        mv.visitMethodInsn(INVOKESTATIC, "oracle/adf/share/logging/ADFLogger", "createADFLogger", "(Ljava/lang/String;)Loracle/adf/share/logging/ADFLogger;", false);
+        mv.visitMethodInsn(INVOKESTATIC, "java/lang/System", "nanoTime", "()J", false);
+        mv.visitVarInsn(LLOAD, time);
+        mv.visitInsn(LSUB);
+        mv.visitLdcInsn(new Long(1000000L));
+        int elapsedTime = localVariablesSorter.newLocal(Type.LONG_TYPE);
+        mv.visitInsn(LDIV);
+        mv.visitVarInsn(LSTORE, elapsedTime);
+        mv.visitVarInsn(LLOAD, elapsedTime);
+        mv.visitLdcInsn(new Long(10L));
+        mv.visitInsn(LCMP);
+        Label l0 = new Label();
+        mv.visitJumpInsn(IFLE, l0);
+        mv.visitFieldInsn(GETSTATIC, "oracle/jbo/server/ViewObjectImpl", "cc_metrics_logger", "Loracle/adf/share/logging/ADFLogger;");
         mv.visitTypeInsn(NEW, "java/lang/StringBuilder");
         mv.visitInsn(DUP);
         mv.visitMethodInsn(INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false);
-        mv.visitLdcInsn(this.className + ", " + methodName + ", " + this.desc + " , ElapsedTime=");
+        mv.visitLdcInsn("executeQuery, name=");
         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-        mv.visitMethodInsn(INVOKESTATIC, "java/lang/System","nanoTime","()J", false);
-        mv.visitVarInsn(LLOAD, time);
-        mv.visitInsn(LSUB);
+        mv.visitVarInsn(ALOAD, 0);
+        mv.visitMethodInsn(INVOKESPECIAL, "oracle/jbo/server/ViewObjectImpl", "getName", "()Ljava/lang/String;", false);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+        mv.visitLdcInsn(", elapsedTime=");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+        mv.visitVarInsn(LLOAD, elapsedTime);
         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(J)Ljava/lang/StringBuilder;", false);
+        mv.visitLdcInsn(", query=");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+        mv.visitVarInsn(ALOAD, 0);
+        mv.visitMethodInsn(INVOKESPECIAL, "oracle/jbo/server/ViewObjectImpl", "getQuery", "()Ljava/lang/String;", false);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;", false);
         mv.visitMethodInsn(INVOKEVIRTUAL, "oracle/adf/share/logging/ADFLogger", "warning", "(Ljava/lang/String;)V", false);
+        mv.visitLabel(l0);
+        mv.visitFrame(Opcodes.F_APPEND,2, new Object[] {Opcodes.LONG, Opcodes.LONG}, 0, null);
     }
     
     @Override
     public void visitInsn(int opCode) {
         System.out.println("visitInsn " + opCode);
-        if((opCode >= IRETURN && opCode <=RETURN) || opCode == ATHROW){
+        if(opCode == RETURN){
             addElapsedTimerEndingInjection();
         }
+        /*if((opCode >= IRETURN && opCode <=RETURN) || opCode == ATHROW){
+            addElapsedTimerEndingInjection();
+        }*/
         mv.visitInsn(opCode); //To change body of generated methods, choose Tools | Templates.
     }
 

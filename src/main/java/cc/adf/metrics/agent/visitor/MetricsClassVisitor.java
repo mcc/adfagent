@@ -7,6 +7,7 @@ package cc.adf.metrics.agent.visitor;
 
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -19,21 +20,24 @@ import org.objectweb.asm.commons.LocalVariablesSorter;
  * @author cc
  */
 public class MetricsClassVisitor extends ClassVisitor{
-    private String name;
-    public MetricsClassVisitor(ClassVisitor cv, String name) {
-        super(Opcodes.ASM4, cv);
-        this.name = name;
+    private String className;
+    private ClassWriter cw;
+    public MetricsClassVisitor(ClassWriter cw, String className) {
+        super(Opcodes.ASM4, cw);
+        this.cw = cw;
+        this.className = className;
     }
 
     @Override
-    public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
-        System.out.println("Visiting Method " + name);
-        MethodVisitor mv = cv.visitMethod(access, name, desc, signature, exceptions);
+    public MethodVisitor visitMethod(int access, String methodName, String desc, String signature, String[] exceptions) {
+        //System.out.println("Visiting Method " + name);
+        MethodVisitor mv = cv.visitMethod(access, methodName, desc, signature, exceptions);
         boolean isInterface = (access & ACC_INTERFACE) != 0;
-        if (!isInterface && mv != null && !name.equals("<init>") && !name.equals("main1") && !name.equals("test")){
+        if (!isInterface && mv != null && (methodName.equals("passivateState") || methodName.equals("create"))){
+            System.out.println("Visiting Method " + methodName);
             System.out.println("Pre Enter MetricsMethodVisitor");
-            MetricsMethodVisitor newMv = new MetricsMethodVisitor(mv, name);
-            System.out.println("this.name = " + this.name + ", desc = " + desc);
+            MetricsMethodVisitor newMv = new MetricsMethodVisitor(mv, this.className, methodName, desc);
+            System.out.println("this.name = " + this.className + ", desc = " + desc);
             //newMv.analyzerAdapter = new AnalyzerAdapter(this.name, access, name, desc, newMv);
             //newMv.localVariablesSorter = new LocalVariablesSorter(access, desc, newMv.analyzerAdapter);
             newMv.localVariablesSorter = new LocalVariablesSorter(access, desc, newMv);
@@ -52,6 +56,7 @@ public class MetricsClassVisitor extends ClassVisitor{
     public void visitSource(String string, String string1) {
         System.out.println("Visiting Source " + string);
         super.visitSource(string, string1); //To change body of generated methods, choose Tools | Templates.
+        ApplicationModuleImplModifier.addDetailNameMethod(this.cw);
     }
 
     @Override
