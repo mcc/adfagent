@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+        <action>
+            <actionName>CUSTOM-package</actionName>
+            <displayName>package</displayName>
+            <goals>
+                <goal>package</goal>
+            </goals>
+        </action>
+        <action>
+            <actionName>CUSTOM-clean compile package</actionName>
+            <displayName>clean compile package</displayName>
+            <goals>
+                <goal>clean</goal>
+                <goal>compile</goal>
+                <goal>package</goal>
+            </goals>
+        </action>
+    </actions>
